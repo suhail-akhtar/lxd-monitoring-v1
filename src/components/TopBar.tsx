@@ -1,7 +1,7 @@
-// src/components/TopBar.tsx - Clean version
-import React from 'react';
+// src/components/TopBar.tsx - Fixed project dropdown with better debugging
+import React, { useEffect } from 'react';
 import { ChevronRight, RefreshCw } from 'lucide-react';
-import { useProject } from '../hooks/useProject';
+import { useProject } from '../context/ProjectContext';
 import type { PageType } from '../App';
 
 interface TopBarProps {
@@ -11,7 +11,18 @@ interface TopBarProps {
 }
 
 const TopBar: React.FC<TopBarProps> = ({ currentPage, onRefresh, refreshing = false }) => {
-  const { currentProject, projects, loading, switchProject } = useProject();
+  const { currentProject, projects, loading, error, switchProject, refreshProjects } = useProject();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 TopBar: Project state updated:', {
+      currentProject,
+      projectCount: projects.length,
+      projects: projects.map(p => ({ name: p.name, description: p.description })),
+      loading,
+      error
+    });
+  }, [currentProject, projects, loading, error]);
 
   const getPageTitle = (page: PageType) => {
     const titles = {
@@ -30,8 +41,21 @@ const TopBar: React.FC<TopBarProps> = ({ currentPage, onRefresh, refreshing = fa
 
   const handleProjectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedProject = event.target.value;
+    console.log(`🔄 TopBar: Project selection changed to: "${selectedProject}"`);
     switchProject(selectedProject);
   };
+
+  const handleTimeRangeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    console.log('🔄 TopBar: Time range changed:', event.target.value);
+  };
+
+  const handleRefreshProjects = async () => {
+    console.log('🔄 TopBar: Manual project refresh requested');
+    await refreshProjects();
+  };
+
+  // Show current project in badge
+  const displayProject = currentProject || (projects.length > 0 ? projects[0].name : 'Default');
 
   return (
     <div className="top-bar">
@@ -40,38 +64,62 @@ const TopBar: React.FC<TopBarProps> = ({ currentPage, onRefresh, refreshing = fa
         <ChevronRight style={{ width: '16px', height: '16px' }} />
         <span className="current">{getPageTitle(currentPage)}</span>
         <span className="project-badge" id="current-project">
-          {currentProject || 'Default'}
+          {displayProject}
+          {loading && ' (Loading...)'}
         </span>
       </div>
 
       <div className="top-controls">
         <select 
           className="project-selector" 
-          value={currentProject || 'default'} 
+          value={currentProject || ''} 
           onChange={handleProjectChange}
           disabled={loading}
+          title={error ? `Error: ${error}` : `${projects.length} projects available`}
         >
           {loading ? (
-            <option value="default">Loading projects...</option>
+            <option value="">Loading projects...</option>
+          ) : error ? (
+            <option value="">Error loading projects</option>
           ) : projects.length === 0 ? (
-            <option value="default">Default Project</option>
+            <option value="">No projects found</option>
           ) : (
             <>
-              <option value="">All Projects</option>
+              {/* Show "All Projects" option only if we have multiple projects */}
+              {projects.length > 1 && (
+                <option value="">All Projects</option>
+              )}
               {projects.map((project) => (
                 <option key={project.name} value={project.name}>
                   {project.name}
-                  {project.description && ` - ${project.description}`}
+                  {project.description && project.description !== project.name && ` - ${project.description}`}
                 </option>
               ))}
             </>
           )}
         </select>
 
-        <select className="time-range">
+        {/* Add refresh button for projects if there's an error */}
+        {error && (
+          <button 
+            className="panel-btn" 
+            onClick={handleRefreshProjects}
+            disabled={loading}
+            title="Refresh projects"
+            style={{ marginLeft: '0.5rem', padding: '0.5rem' }}
+          >
+            <RefreshCw style={{ width: '14px', height: '14px' }} />
+          </button>
+        )}
+
+        <select 
+          className="time-range" 
+          defaultValue="24h"
+          onChange={handleTimeRangeChange}
+        >
           <option value="1h">Last 1 hour</option>
           <option value="6h">Last 6 hours</option>
-          <option value="24h" selected>Last 24 hours</option>
+          <option value="24h">Last 24 hours</option>
           <option value="7d">Last 7 days</option>
           <option value="30d">Last 30 days</option>
         </select>

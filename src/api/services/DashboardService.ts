@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// src/api/services/DashboardService.ts
-// src/api/services/DashboardService.ts - Enhanced with cluster calculations
+// src/api/services/DashboardService.ts - Fixed operations and network state issues
 import { LXDApiClient } from '../client/LXDApiClient';
 import type {
   DashboardData,
@@ -48,6 +47,7 @@ export interface DashboardServiceConfig {
   maxRecentOperations?: number;
   project?: string;
   includeStates?: boolean;
+  includeNetworkStates?: boolean; // New option to disable network states
   timeSeriesPoints?: number;
 }
 
@@ -61,6 +61,7 @@ export class DashboardService {
     this.config = {
       maxRecentOperations: 10,
       includeStates: true,
+      includeNetworkStates: false, // Disabled by default to avoid 500 errors
       timeSeriesPoints: 12, // Last 12 data points for trends
       ...config,
     };
@@ -93,7 +94,7 @@ export class DashboardService {
       const [instanceStates, storageResources, networkStates, clusterResources] = await Promise.all([
         this.config.includeStates ? this.fetchInstanceStates(instances) : new Map<string, InstanceState>(),
         this.fetchStorageResources(storagePools),
-        this.config.includeStates ? this.fetchNetworkStates(networks) : new Map<string, NetworkState>(),
+        (this.config.includeStates && this.config.includeNetworkStates) ? this.fetchNetworkStates(networks) : new Map<string, NetworkState>(),
         this.fetchClusterResources(clusterMembers),
       ]);
 
@@ -132,24 +133,79 @@ export class DashboardService {
     }
   }
 
-  private async fetchProjects(): Promise<ProjectInfo[]> {
+private async fetchProjects(): Promise<ProjectInfo[]> {
     try {
-      const projectNames = await this.apiClient.getProjects();
+      console.log('Fetching projects from LXD API...');
       
-      const projectPromises = projectNames.map(async (name: string) => {
-        const projectName = name.split('/').pop();
-        return this.apiClient.getProjectInfo(projectName!);
+      // First get the list of project URLs
+      const projectUrls = await this.apiClient.getProjects();
+      console.log('Project URLs received:', projectUrls);
+      
+      // Check if projectUrls is an array of URLs or objects
+      if (!Array.isArray(projectUrls)) {
+        console.warn('Projects API returned non-array:', projectUrls);
+        return [];
+      }
+
+      if (projectUrls.length === 0) {
+        console.log('No projects found in LXD');
+        return [];
+      }
+
+      // Fetch detailed info for each project
+      const projectPromises = projectUrls.map(async (url: string) => {
+        try {
+          // Extract project name from URL (e.g., "/1.0/projects/default" -> "default")
+          const projectName = url.split('/').pop();
+          if (!projectName) {
+            console.warn('Could not extract project name from URL:', url);
+            return null;
+          }
+          
+          console.log(`Fetching details for project: ${projectName}`);
+          const project = await this.apiClient.getProjectInfo(projectName);
+          console.log(`Project ${projectName} details:`, project);
+          
+          // Ensure we have the required properties
+          return {
+            name: project.name || projectName,
+            description: project.description || '',
+            config: project.config || {},
+            used_by: project.used_by || []
+          };
+        } catch (error) {
+          console.error(`Failed to fetch project info for ${url}:`, error);
+          return null;
+        }
       });
 
-      return await Promise.all(projectPromises);
+      const projects = await Promise.all(projectPromises);
+      const validProjects = projects.filter(project => project !== null);
+      
+      console.log(`Successfully fetched ${validProjects.length} projects:`, validProjects.map(p => p.name));
+      return validProjects;
     } catch (error) {
       console.error('Failed to fetch projects:', error);
-      return [];
+      
+      // Return a default project if fetching fails
+      console.log('Falling back to default project');
+      return [
+        { 
+          name: 'default', 
+          description: 'Default Project', 
+          config: {}, 
+          used_by: [] 
+        }
+      ];
     }
   }
-
   private async fetchClusterResources(clusterMembers: ClusterMember[]): Promise<ClusterResourceInfo[]> {
     const clusterResources: ClusterResourceInfo[] = [];
+
+    if (clusterMembers.length === 0) {
+      console.log('No cluster members found, might be a standalone LXD instance');
+      return clusterResources;
+    }
 
     const resourcePromises = clusterMembers.map(async (member) => {
       try {
@@ -165,12 +221,14 @@ export class DashboardService {
         let totalNetworkRx = 0;
         let totalNetworkTx = 0;
 
-        Object.values(network).forEach((iface: any) => {
-          if (iface.counters) {
-            totalNetworkRx += iface.counters.bytes_received || 0;
-            totalNetworkTx += iface.counters.bytes_sent || 0;
-          }
-        });
+        if (network && typeof network === 'object') {
+          Object.values(network).forEach((iface: any) => {
+            if (iface && iface.counters) {
+              totalNetworkRx += iface.counters.bytes_received || 0;
+              totalNetworkTx += iface.counters.bytes_sent || 0;
+            }
+          });
+        }
 
         clusterResources.push({
           name: member.server_name,
@@ -309,9 +367,9 @@ export class DashboardService {
     
     const healthPercentage = totalNodes > 0 
       ? Math.round((healthyNodes / totalNodes) * 100) 
-      : 0;
+      : 100; // 100% if no cluster (standalone)
 
-    return { totalNodes, healthyNodes, healthPercentage };
+    return { totalNodes: Math.max(totalNodes, 1), healthyNodes: Math.max(healthyNodes, 1), healthPercentage };
   }
 
   private calculateClusterResourceMetrics(
@@ -375,17 +433,30 @@ export class DashboardService {
     };
   }
 
-  // Existing methods remain the same but with enhanced error handling
+  // Existing methods with fixes
   private async fetchInstances(): Promise<InstanceInfo[]> {
     try {
-      const instanceNames = await this.apiClient.getInstances(this.config.project);
+      const instanceUrls = await this.apiClient.getInstances(this.config.project);
       
-      const instancePromises = instanceNames.map(async (name: string) => {
-        const instanceName = name.split('/').pop();
-        return this.apiClient.getInstanceInfo(instanceName!, this.config.project);
+      if (!Array.isArray(instanceUrls)) {
+        console.warn('Instances API returned non-array:', instanceUrls);
+        return [];
+      }
+
+      const instancePromises = instanceUrls.map(async (url: string) => {
+        try {
+          const instanceName = url.split('/').pop();
+          if (!instanceName) return null;
+          
+          return await this.apiClient.getInstanceInfo(instanceName, this.config.project);
+        } catch (error) {
+          console.error(`Failed to fetch instance info for ${url}:`, error);
+          return null;
+        }
       });
 
-      return await Promise.all(instancePromises);
+      const instances = await Promise.all(instancePromises);
+      return instances.filter(instance => instance !== null);
     } catch (error) {
       console.error('Failed to fetch instances:', error);
       return [];
@@ -410,14 +481,27 @@ export class DashboardService {
 
   private async fetchClusterMembers(): Promise<ClusterMember[]> {
     try {
-      const memberNames = await this.apiClient.getClusterMembers();
+      const memberUrls = await this.apiClient.getClusterMembers();
       
-      const memberPromises = memberNames.map(async (name: string) => {
-        const memberName = name.split('/').pop();
-        return this.apiClient.getClusterMemberInfo(memberName!);
+      if (!Array.isArray(memberUrls)) {
+        console.warn('Cluster members API returned non-array:', memberUrls);
+        return [];
+      }
+
+      const memberPromises = memberUrls.map(async (url: string) => {
+        try {
+          const memberName = url.split('/').pop();
+          if (!memberName) return null;
+          
+          return await this.apiClient.getClusterMemberInfo(memberName);
+        } catch (error) {
+          console.error(`Failed to fetch cluster member info for ${url}:`, error);
+          return null;
+        }
       });
 
-      return await Promise.all(memberPromises);
+      const members = await Promise.all(memberPromises);
+      return members.filter(member => member !== null);
     } catch (error) {
       console.error('Failed to fetch cluster members:', error);
       return [];
@@ -426,14 +510,27 @@ export class DashboardService {
 
   private async fetchStoragePools(): Promise<StoragePool[]> {
     try {
-      const poolNames = await this.apiClient.getStoragePools();
+      const poolUrls = await this.apiClient.getStoragePools();
       
-      const poolPromises = poolNames.map(async (name: string) => {
-        const poolName = name.split('/').pop();
-        return this.apiClient.getStoragePoolInfo(poolName!);
+      if (!Array.isArray(poolUrls)) {
+        console.warn('Storage pools API returned non-array:', poolUrls);
+        return [];
+      }
+
+      const poolPromises = poolUrls.map(async (url: string) => {
+        try {
+          const poolName = url.split('/').pop();
+          if (!poolName) return null;
+          
+          return await this.apiClient.getStoragePoolInfo(poolName);
+        } catch (error) {
+          console.error(`Failed to fetch storage pool info for ${url}:`, error);
+          return null;
+        }
       });
 
-      return await Promise.all(poolPromises);
+      const pools = await Promise.all(poolPromises);
+      return pools.filter(pool => pool !== null);
     } catch (error) {
       console.error('Failed to fetch storage pools:', error);
       return [];
@@ -458,29 +555,61 @@ export class DashboardService {
 
   private async fetchNetworks(): Promise<NetworkInfo[]> {
     try {
-      const networkNames = await this.apiClient.getNetworks();
+      const networkUrls = await this.apiClient.getNetworks();
       
-      const networkPromises = networkNames.map(async (name: string) => {
-        const networkName = name.split('/').pop();
-        return this.apiClient.getNetworkInfo(networkName!);
+      if (!Array.isArray(networkUrls)) {
+        console.warn('Networks API returned non-array:', networkUrls);
+        return [];
+      }
+
+      const networkPromises = networkUrls.map(async (url: string) => {
+        try {
+          const networkName = url.split('/').pop();
+          if (!networkName) return null;
+          
+          return await this.apiClient.getNetworkInfo(networkName);
+        } catch (error) {
+          console.error(`Failed to fetch network info for ${url}:`, error);
+          return null;
+        }
       });
 
-      return await Promise.all(networkPromises);
+      const networks = await Promise.all(networkPromises);
+      return networks.filter(network => network !== null);
     } catch (error) {
       console.error('Failed to fetch networks:', error);
       return [];
     }
   }
 
-  private async fetchNetworkStates(networks: NetworkInfo[]): Promise<Map<string, NetworkState>> {
+private async fetchNetworkStates(networks: NetworkInfo[]): Promise<Map<string, NetworkState>> {
     const stateMap = new Map<string, NetworkState>();
 
     const statePromises = networks.map(async (network) => {
       try {
+        // Skip certain network types that don't support state queries
+        const networkType = network.type?.toLowerCase() || '';
+        const networkName = network.name?.toLowerCase() || '';
+        
+        // Skip networks that commonly don't support state queries
+        if (
+          networkType === 'physical' || 
+          networkType === 'macvlan' || 
+          networkType === 'sriov' ||
+          networkName === 'mgmt' ||
+          networkName === 'management' ||
+          networkName.includes('mgmt') ||
+          !network.managed // Skip unmanaged networks
+        ) {
+          console.log(`Skipping state query for network: ${network.name} (type: ${networkType || 'unknown'})`);
+          return;
+        }
+
         const state = await this.apiClient.getNetworkState(network.name);
         stateMap.set(network.name, state);
       } catch (error) {
         console.error(`Failed to fetch state for network ${network.name}:`, error);
+        // Don't throw, just skip this network state
       }
     });
 
@@ -490,9 +619,33 @@ export class DashboardService {
 
   private async fetchRecentOperations(): Promise<Operation[]> {
     try {
-      const operations = await this.apiClient.getOperations();
+      const operationUrls = await this.apiClient.getOperations();
       
-      return operations
+      if (!Array.isArray(operationUrls)) {
+        console.warn('Operations API returned non-array:', operationUrls);
+        return [];
+      }
+
+      // Limit the number of operations we fetch to avoid too many requests
+      const limitedUrls = operationUrls.slice(0, this.config.maxRecentOperations! * 2);
+      
+      const operationPromises = limitedUrls.map(async (url: string) => {
+        try {
+          const operationId = url.split('/').pop();
+          if (!operationId) return null;
+          
+          return await this.apiClient.getOperationInfo(operationId);
+        } catch (error) {
+          console.error(`Failed to fetch operation info for ${url}:`, error);
+          return null;
+        }
+      });
+
+      const operations = await Promise.all(operationPromises);
+      const validOperations = operations.filter(op => op !== null);
+      
+      // Sort by creation date and limit results
+      return validOperations
         .sort((a: Operation, b: Operation) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )

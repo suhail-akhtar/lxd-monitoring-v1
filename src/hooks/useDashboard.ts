@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/hooks/useDashboard.ts - Enhanced version
+// src/hooks/useDashboard.ts - Fixed version with proper project switching
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ServiceFactory } from '../api/ServiceFactory';
 import type { DashboardData } from '../api/types/dashboard';
 import { useProject } from '../hooks/useProject';
 
 export interface UseDashboardOptions {
-    project?: string; 
+  project?: string; 
   autoRefresh?: boolean;
   refreshInterval?: number;
   includeStates?: boolean;
@@ -49,6 +49,7 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
   );
 
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const previousProjectRef = useRef<string>(currentProject);
 
   const fetchData = useCallback(async (showLoading = true) => {
     if (showLoading) {
@@ -60,9 +61,11 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
       // Update service with current project
       await dashboardService.current.switchProject(currentProject);
       
+      console.log(`Fetching dashboard data for project: ${currentProject || 'all projects'}`);
       const dashboardData = await dashboardService.current.getDashboardData();
       setData(dashboardData as EnhancedDashboardData);
       setLastUpdated(new Date());
+      console.log('Dashboard data loaded successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch dashboard data';
       setError(errorMessage);
@@ -102,8 +105,21 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
 
   // Refresh when project changes
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    // Only refresh if project actually changed
+    if (previousProjectRef.current !== currentProject) {
+      console.log(`Project changed from "${previousProjectRef.current}" to "${currentProject}" - refreshing data`);
+      previousProjectRef.current = currentProject;
+      fetchData();
+    }
+  }, [currentProject, fetchData]);
+
+  // Initial load
+  useEffect(() => {
+    if (previousProjectRef.current === currentProject) {
+      // Only do initial load if we haven't already loaded for this project
+      fetchData();
+    }
+  }, []); // Only run on mount
 
   // Auto-refresh setup
   useEffect(() => {

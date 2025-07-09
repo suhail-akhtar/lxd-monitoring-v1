@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/context/ProjectContext.tsx - Fixed version
-import React, { createContext, useState, useEffect } from 'react';
+// src/context/ProjectContext.tsx - Fixed project loading with better error handling
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 export interface ProjectInfo {
@@ -20,7 +20,7 @@ interface ProjectContextType {
 }
 
 const defaultContextValue: ProjectContextType = {
-  currentProject: 'default',
+  currentProject: '',
   projects: [],
   loading: false,
   error: null,
@@ -35,54 +35,95 @@ interface ProjectProviderProps {
   defaultProject?: string;
 }
 
-export function ProjectProvider({ children, defaultProject = 'default' }: ProjectProviderProps) {
+export function ProjectProvider({ children, defaultProject = '' }: ProjectProviderProps) {
   const [currentProject, setCurrentProject] = useState<string>(defaultProject);
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchProjects = async () => {
+    console.log('🔄 ProjectContext: Starting to fetch projects...');
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      setError(null);
-      
       // Dynamically import to avoid circular dependencies
       const { ServiceFactory } = await import('../api/ServiceFactory');
       const serviceFactory = ServiceFactory.getInstance();
       const dashboardService = serviceFactory.getDashboardService();
+      
+      console.log('🔄 ProjectContext: Calling getProjects()...');
       const projectList = await dashboardService.getProjects();
       
+      console.log('✅ ProjectContext: Projects fetched successfully:', projectList);
       setProjects(projectList);
       
+      // If we have projects and no current project is set, set to first project
+      if (projectList.length > 0 && !currentProject) {
+        console.log(`🔄 ProjectContext: Setting current project to: ${projectList[0].name}`);
+        setCurrentProject(projectList[0].name);
+      }
+      
       // If current project doesn't exist in the list, switch to the first available
-      if (projectList.length > 0 && !projectList.find(p => p.name === currentProject)) {
+      if (projectList.length > 0 && currentProject && !projectList.find(p => p.name === currentProject)) {
+        console.log(`⚠️ ProjectContext: Current project "${currentProject}" not found, switching to "${projectList[0].name}"`);
         setCurrentProject(projectList[0].name);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects';
       setError(errorMessage);
-      console.error('Failed to fetch projects:', err);
+      console.error('❌ ProjectContext: Failed to fetch projects:', err);
+      
+      // Set a default project list if fetch fails
+      const fallbackProjects = [
+        { name: 'default', description: 'Default Project', config: {}, used_by: [] }
+      ];
+      console.log('🔄 ProjectContext: Using fallback projects:', fallbackProjects);
+      setProjects(fallbackProjects);
+      
+      if (!currentProject) {
+        setCurrentProject('default');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const switchProject = (projectName: string) => {
+    console.log(`🔄 ProjectContext: Switching project from "${currentProject}" to "${projectName}"`);
     setCurrentProject(projectName);
   };
 
   const refreshProjects = async () => {
+    console.log('🔄 ProjectContext: Manual refresh requested');
     await fetchProjects();
   };
 
   useEffect(() => {
+    console.log('🔄 ProjectContext: Component mounted, scheduling project fetch...');
+    
     // Delay initial fetch to ensure services are initialized
     const timer = setTimeout(() => {
+      console.log('🔄 ProjectContext: Timer fired, fetching projects...');
       fetchProjects();
-    }, 100);
+    }, 2000); // Increased delay to ensure API is ready
 
-    return () => clearTimeout(timer);
+    return () => {
+      console.log('🔄 ProjectContext: Cleaning up timer');
+      clearTimeout(timer);
+    };
   }, []);
+
+  // Log current state for debugging
+  useEffect(() => {
+    console.log('🔍 ProjectContext State:', {
+      currentProject,
+      projectCount: projects.length,
+      projectNames: projects.map(p => p.name),
+      loading,
+      error
+    });
+  }, [currentProject, projects, loading, error]);
 
   const value: ProjectContextType = {
     currentProject,
@@ -100,11 +141,11 @@ export function ProjectProvider({ children, defaultProject = 'default' }: Projec
   );
 }
 
-// export function useProject(): ProjectContextType {
-//   const context = useContext(ProjectContext);
-//   if (!context) {
-//     console.warn('useProject called outside of ProjectProvider, using defaults');
-//     return defaultContextValue;
-//   }
-//   return context;
-// }
+export function useProject(): ProjectContextType {
+  const context = useContext(ProjectContext);
+  if (!context) {
+    console.warn('useProject called outside of ProjectProvider, using defaults');
+    return defaultContextValue;
+  }
+  return context;
+}

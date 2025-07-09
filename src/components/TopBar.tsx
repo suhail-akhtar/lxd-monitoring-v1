@@ -1,13 +1,33 @@
 import React from 'react';
 import { ChevronRight, RefreshCw } from 'lucide-react';
+import type { PageType } from '../App';
 
-const TopBar: React.FC = () => {
+interface TopBarProps {
+  currentPage: PageType;
+}
+
+const TopBar: React.FC<TopBarProps> = ({ currentPage }) => {
+  const getPageTitle = (page: PageType) => {
+    const titles = {
+      'overview': 'Overview Dashboard',
+      'instances': 'Instances',
+      'cluster-nodes': 'Cluster Nodes',
+      'networks': 'Networks',
+      'storage': 'Storage',
+      'operations': 'Operations',
+      'events': 'Events & Logs',
+      'metrics': 'Metrics',
+      'projects': 'Projects'
+    };
+    return titles[page] || 'Dashboard';
+  };
+
   return (
     <div className="top-bar">
       <div className="breadcrumb">
         <span>MicroCloud</span>
         <ChevronRight style={{ width: '16px', height: '16px' }} />
-        <span className="current">Overview Dashboard</span>
+        <span className="current">{getPageTitle(currentPage)}</span>
         <span className="project-badge" id="current-project">
           Production
         </span>
@@ -16,9 +36,7 @@ const TopBar: React.FC = () => {
       <div className="top-controls">
         <select className="project-selector" defaultValue="production">
           <option value="all">All Projects</option>
-          <option value="production">
-            Production
-          </option>
+          <option value="production">Production</option>
           <option value="staging">Staging</option>
           <option value="development">Development</option>
           <option value="testing">Testing</option>

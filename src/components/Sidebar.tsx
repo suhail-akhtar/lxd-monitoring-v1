@@ -10,8 +10,26 @@ import {
   BarChart3,
   Folder,
 } from 'lucide-react';
+import type { PageType } from '../App';
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  currentPage: PageType;
+  onPageChange: (page: PageType) => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
+  const navItems = [
+    { id: 'overview' as PageType, icon: LayoutDashboard, label: 'Overview' },
+    { id: 'instances' as PageType, icon: Box, label: 'Instances' },
+    { id: 'cluster-nodes' as PageType, icon: Server, label: 'Cluster Nodes' },
+    { id: 'networks' as PageType, icon: Network, label: 'Networks' },
+    { id: 'storage' as PageType, icon: HardDrive, label: 'Storage' },
+    { id: 'operations' as PageType, icon: Activity, label: 'Operations' },
+    { id: 'events' as PageType, icon: ScrollText, label: 'Events & Logs' },
+    { id: 'metrics' as PageType, icon: BarChart3, label: 'Metrics' },
+    { id: 'projects' as PageType, icon: Folder, label: 'Projects' },
+  ];
+
   return (
     <nav className="sidebar" id="sidebar">
       <div className="sidebar-header">
@@ -28,54 +46,58 @@ const Sidebar: React.FC = () => {
 
       <div className="nav-section">
         <div className="nav-section-title">Dashboard</div>
-        <a href="#" className="nav-item active">
+        <button 
+          onClick={() => onPageChange('overview')}
+          className={`nav-item ${currentPage === 'overview' ? 'active' : ''}`}
+        >
           <LayoutDashboard size={18} />
           <span>Overview</span>
-        </a>
+        </button>
       </div>
 
       <div className="nav-section">
         <div className="nav-section-title">Resources</div>
-        <a href="#" className="nav-item">
-          <Box size={18} />
-          <span>Instances</span>
-        </a>
-        <a href="/cluster-nodes" className="nav-item">
-          <Server size={18} />
-          <span>Cluster Nodes</span>
-        </a>
-        <a href="/networks" className="nav-item">
-          <Network size={18} />
-          <span>Networks</span>
-        </a>
-        <a href="/storage" className="nav-item">
-          <HardDrive size={18} />
-          <span>Storage</span>
-        </a>
+        {navItems.slice(1, 5).map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onPageChange(item.id)}
+              className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
+            >
+              <Icon size={18} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="nav-section">
         <div className="nav-section-title">Operations</div>
-        <a href="#" className="nav-item">
-          <Activity size={18} />
-          <span>Operations</span>
-        </a>
-        <a href="#" className="nav-item">
-          <ScrollText size={18} />
-          <span>Events & Logs</span>
-        </a>
-        <a href="#" className="nav-item">
-          <BarChart3 size={18} />
-          <span>Metrics</span>
-        </a>
+        {navItems.slice(5, 8).map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onPageChange(item.id)}
+              className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
+            >
+              <Icon size={18} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="nav-section">
         <div className="nav-section-title">Management</div>
-        <a href="#" className="nav-item">
+        <button
+          onClick={() => onPageChange('projects')}
+          className={`nav-item ${currentPage === 'projects' ? 'active' : ''}`}
+        >
           <Folder size={18} />
           <span>Projects</span>
-        </a>
+        </button>
       </div>
     </nav>
   );

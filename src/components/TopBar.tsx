@@ -1,11 +1,15 @@
 // src/components/TopBar.tsx - Fixed project dropdown with better debugging
 import React, { useEffect } from 'react';
 import { ChevronRight, RefreshCw } from 'lucide-react';
+<<<<<<< HEAD
 import { useProject } from '../context/ProjectContext';
+=======
+>>>>>>> 018028a (all pages completed - working fine with mockup data)
 import type { PageType } from '../App';
 
 interface TopBarProps {
   currentPage: PageType;
+<<<<<<< HEAD
   onRefresh?: () => void;
   refreshing?: boolean;
 }
@@ -24,6 +28,11 @@ const TopBar: React.FC<TopBarProps> = ({ currentPage, onRefresh, refreshing = fa
     });
   }, [currentProject, projects, loading, error]);
 
+=======
+}
+
+const TopBar: React.FC<TopBarProps> = ({ currentPage }) => {
+>>>>>>> 018028a (all pages completed - working fine with mockup data)
   const getPageTitle = (page: PageType) => {
     const titles = {
       'overview': 'Overview Dashboard',
@@ -38,6 +47,7 @@ const TopBar: React.FC<TopBarProps> = ({ currentPage, onRefresh, refreshing = fa
     };
     return titles[page] || 'Dashboard';
   };
+<<<<<<< HEAD
 
   const handleProjectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedProject = event.target.value;
@@ -56,6 +66,8 @@ const TopBar: React.FC<TopBarProps> = ({ currentPage, onRefresh, refreshing = fa
 
   // Show current project in badge
   const displayProject = currentProject || (projects.length > 0 ? projects[0].name : 'Default');
+=======
+>>>>>>> 018028a (all pages completed - working fine with mockup data)
 
   return (
     <div className="top-bar">
@@ -70,6 +82,7 @@ const TopBar: React.FC<TopBarProps> = ({ currentPage, onRefresh, refreshing = fa
       </div>
 
       <div className="top-controls">
+<<<<<<< HEAD
         <select 
           className="project-selector" 
           value={currentProject || ''} 
@@ -97,6 +110,14 @@ const TopBar: React.FC<TopBarProps> = ({ currentPage, onRefresh, refreshing = fa
               ))}
             </>
           )}
+=======
+        <select className="project-selector" defaultValue="production">
+          <option value="all">All Projects</option>
+          <option value="production">Production</option>
+          <option value="staging">Staging</option>
+          <option value="development">Development</option>
+          <option value="testing">Testing</option>
+>>>>>>> 018028a (all pages completed - working fine with mockup data)
         </select>
 
         {/* Add refresh button for projects if there's an error */}

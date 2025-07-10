@@ -1,4 +1,3 @@
-// src/components/Layout.tsx - Fixed version without useDashboard at layout level
 import React from 'react';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
@@ -35,11 +34,7 @@ const Layout: React.FC<LayoutProps> = ({ currentPage, onPageChange }) => {
         return <Operations />;
       case 'events':
         return <EventsLogs />;
-<<<<<<< HEAD
-      case 'metrics':
-=======
         case 'metrics':
->>>>>>> 018028a (all pages completed - working fine with mockup data)
         return <Metrics />;
       case 'projects':
         return <Projects />;
@@ -47,29 +42,12 @@ const Layout: React.FC<LayoutProps> = ({ currentPage, onPageChange }) => {
         return <Dashboard />;
     }
   };
-<<<<<<< HEAD
-
-  // Simple refresh function that can be used by any page
-  const handleRefresh = () => {
-    // Force a page refresh for now - individual pages will handle their own refresh
-    window.location.reload();
-  };
-=======
->>>>>>> 018028a (all pages completed - working fine with mockup data)
 
   return (
     <div className="flex">
       <Sidebar currentPage={currentPage} onPageChange={onPageChange} />
       <div className="main-container flex-1">
-<<<<<<< HEAD
-        <TopBar 
-          currentPage={currentPage} 
-          onRefresh={handleRefresh}
-          refreshing={false}
-        />
-=======
         <TopBar currentPage={currentPage} />
->>>>>>> 018028a (all pages completed - working fine with mockup data)
         {renderContent()}
       </div>
     </div>

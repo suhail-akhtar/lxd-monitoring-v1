@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// src/components/charts/ResourceTrendsChart.tsx - Updated with real data
 import React from 'react';
 import { Line } from 'react-chartjs-2';
 import {
@@ -25,64 +23,52 @@ ChartJS.register(
   Filler
 );
 
-interface ResourceTrendsChartProps {
-  data?: {
-    labels: string[];
-    datasets: {
-      label: string;
-      data: number[];
-      borderColor: string;
-      backgroundColor: string;
-      tension: number;
-      fill: boolean;
-      borderWidth: number;
-      yAxisID?: string;
-    }[];
-  } | null;
-  loading?: boolean;
-}
-
-const ResourceTrendsChart: React.FC<ResourceTrendsChartProps> = ({ data, loading = false }) => {
-  // Fallback data when no real data is available
-  const fallbackData = {
-    labels: Array.from({ length: 12 }, (_, i) => {
-      const now = new Date();
-      const time = new Date(now.getTime() - (11 - i) * 5 * 60 * 1000);
-      return time.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-    }),
+const ResourceTrendsChart: React.FC = () => {
+  const data = {
+    labels: ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
     datasets: [
       {
         label: 'CPU Usage (%)',
-        data: Array.from({ length: 12 }, () => 0),
+        data: [45, 48, 52, 58, 65, 72, 78, 82, 87, 84, 79, 73],
         borderColor: '#58a6ff',
         backgroundColor: 'rgba(88, 166, 255, 0.1)',
         tension: 0.4,
         fill: true,
         borderWidth: 3,
+        pointBackgroundColor: '#58a6ff',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
       },
       {
         label: 'Memory Usage (%)',
-        data: Array.from({ length: 12 }, () => 0),
+        data: [38, 40, 41, 43, 45, 47, 48, 50, 52, 51, 49, 46],
         borderColor: '#3fb950',
         backgroundColor: 'rgba(63, 185, 80, 0.1)',
         tension: 0.4,
         fill: true,
         borderWidth: 3,
+        pointBackgroundColor: '#3fb950',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
       },
       {
         label: 'Storage I/O (MB/s)',
-        data: Array.from({ length: 12 }, () => 0),
+        data: [125, 138, 145, 167, 189, 234, 267, 289, 312, 298, 276, 251],
         borderColor: '#bb8009',
         backgroundColor: 'rgba(187, 128, 9, 0.1)',
         tension: 0.4,
         fill: true,
         borderWidth: 3,
+        pointBackgroundColor: '#bb8009',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
         yAxisID: 'y1',
       },
     ],
   };
-
-  const chartData = data || fallbackData;
 
   const options = {
     responsive: true,
@@ -100,26 +86,6 @@ const ResourceTrendsChart: React.FC<ResourceTrendsChartProps> = ({ data, loading
           },
         },
       },
-      tooltip: {
-        mode: 'index' as const,
-        intersect: false,
-        callbacks: {
-          label: function(context: any) {
-            let label = context.dataset.label || '';
-            if (label) {
-              label += ': ';
-            }
-            if (context.parsed.y !== null) {
-              if (context.dataset.yAxisID === 'y1') {
-                label += Math.round(context.parsed.y) + ' MB/s';
-              } else {
-                label += Math.round(context.parsed.y) + '%';
-              }
-            }
-            return label;
-          }
-        }
-      }
     },
     scales: {
       x: {
@@ -151,9 +117,6 @@ const ResourceTrendsChart: React.FC<ResourceTrendsChartProps> = ({ data, loading
             size: 11,
             weight: 500,
           },
-          callback: function(value: any) {
-            return value + '%';
-          }
         },
       },
       y1: {
@@ -170,30 +133,12 @@ const ResourceTrendsChart: React.FC<ResourceTrendsChartProps> = ({ data, loading
             size: 11,
             weight: 500,
           },
-          callback: function(value: any) {
-            return value + ' MB/s';
-          }
         },
       },
     },
   };
 
-  if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        height: '100%',
-        color: '#8b949e' 
-      }}>
-        <div className="spinner" style={{ width: '24px', height: '24px' }}></div>
-        <span style={{ marginLeft: '0.5rem' }}>Loading trends...</span>
-      </div>
-    );
-  }
-
-  return <Line options={options} data={chartData} />;
+  return <Line options={options} data={data} />;
 };
 
 export default ResourceTrendsChart;

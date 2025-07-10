@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// src/components/Dashboard.tsx - Fully Functional with Real Data
 import React from 'react';
 import {
   Layers,
@@ -23,18 +25,151 @@ import {
   ArrowRight,
   AlertTriangle,
   X,
+  Activity,
 } from 'lucide-react';
 import ResourceTrendsChart from './charts/ResourceTrendsChart';
 import InstanceStatusChart from './charts/InstanceStatusChart';
 import PerformanceChart from './charts/PerformanceChart';
+import DebugPanel from './DebugPanel';
+import { useDashboard } from '../hooks/useDashboard';
+import { useApiHealth } from '../hooks/useApiHealth';
+import { useChartData } from '../hooks/useChartData';
+import { useProject } from '../hooks/useProject';
+
+// Helper functions to format data
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
+const formatThroughput = (bytesPerSecond: number): string => {
+  return formatBytes(bytesPerSecond) + '/s';
+};
+
+const getTimeAgo = (date: Date): string => {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return 'just now';
+};
 
 const Dashboard: React.FC = () => {
+  const { currentProject, projects } = useProject();
+  const { data, loading, error, lastUpdated, refresh } = useDashboard({
+    autoRefresh: true,
+    refreshInterval: 30000,
+    includeStates: true,
+  });
+
+  const { isHealthy, checking } = useApiHealth();
+  const { instanceStatusData, resourceTrendsData, performanceData } = useChartData(data);
+
+  // Show debug panel in development
+  const showDebug = false; //process.env.NODE_ENV === 'development';
+  
+  // Loading state
+  if (loading && !data) {
+    return (
+      <div className="dashboard-content" id="dashboard-content">
+        {showDebug && <DebugPanel />}
+        <div className="page-header">
+          <h1 className="page-title">Cluster Monitoring Dashboard</h1>
+          <p className="page-subtitle">Loading MicroCloud LXD infrastructure data...</p>
+        </div>
+        <div className="loading">
+          <div className="spinner"></div>
+          <p>Connecting to LXD API...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && !data) {
+    return (
+      <div className="dashboard-content" id="dashboard-content">
+        {showDebug && <DebugPanel />}
+        <div className="page-header">
+          <h1 className="page-title">Cluster Monitoring Dashboard</h1>
+          <p className="page-subtitle">Unable to connect to MicroCloud LXD infrastructure</p>
+        </div>
+        <div className="panel panel-full">
+          <div className="panel-header">
+            <div className="panel-title">
+              <X style={{ width: '16px', height: '16px' }} />
+              Connection Error
+            </div>
+            <div className="panel-actions">
+              <button className="panel-btn" onClick={refresh}>
+                <RefreshCw style={{ width: '14px', height: '14px' }} />
+                Retry
+              </button>
+            </div>
+          </div>
+          <div className="panel-content">
+            <div style={{ color: '#f85149', padding: '2rem', textAlign: 'center' }}>
+              <AlertTriangle style={{ width: '48px', height: '48px', margin: '0 auto 1rem' }} />
+              <h3>Failed to Connect to LXD API</h3>
+              <p style={{ color: '#8b949e', marginTop: '0.5rem' }}>{error}</p>
+              <div style={{ marginTop: '1rem', fontSize: '0.875rem', color: '#8b949e' }}>
+                <p>Please ensure:</p>
+                <ul style={{ textAlign: 'left', marginTop: '0.5rem' }}>
+                  <li>LXD API is running on https://172.21.200.18:8443</li>
+                  <li>Client certificates are properly configured</li>
+                  <li>Network connectivity is available</li>
+                  <li>CORS policy allows browser connections (or use a proxy)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const { metrics, instances, clusterMembers, storagePools, storageResources, networks, recentOperations } = data;
+
+  // Get current project info
+  const currentProjectInfo = projects.find(p => p.name === currentProject);
+
   return (
     <div className="dashboard-content" id="dashboard-content">
+      {showDebug && <DebugPanel />}
+      
       <div className="page-header">
         <h1 className="page-title">Cluster Monitoring Dashboard</h1>
         <p className="page-subtitle">
           Real-time monitoring, performance metrics, and troubleshooting for your MicroCloud LXD infrastructure
+          <br />
+          <span style={{ fontSize: '0.9rem', color: '#58a6ff' }}>
+            Project: {currentProject || 'All Projects'} 
+            {currentProjectInfo && currentProjectInfo.description && ` (${currentProjectInfo.description})`} • 
+            {data?.clusterMembers?.length || 0} Cluster Nodes • 
+            {data?.instances?.length || 0} Total Instances
+          </span>
+          {lastUpdated && (
+            <span style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.875rem', color: '#8b949e' }}>
+              Last updated: {getTimeAgo(lastUpdated)}
+              {!isHealthy && (
+                <span style={{ color: '#f85149', marginLeft: '0.5rem' }}>
+                  • API Connection Issues
+                </span>
+              )}
+            </span>
+          )}
         </p>
       </div>
 
@@ -47,10 +182,10 @@ const Dashboard: React.FC = () => {
               <Layers style={{ width: '20px', height: '20px' }} />
             </div>
           </div>
-          <div className="metric-value">1,247</div>
+          <div className="metric-value">{metrics.instances.total.toLocaleString()}</div>
           <div className="metric-change positive">
             <TrendingUp style={{ width: '16px', height: '16px' }} />
-            +47 this week
+            {metrics.instances.running} running
           </div>
         </div>
 
@@ -61,10 +196,10 @@ const Dashboard: React.FC = () => {
               <Server style={{ width: '20px', height: '20px' }} />
             </div>
           </div>
-          <div className="metric-value">98.7%</div>
+          <div className="metric-value">{metrics.cluster.healthPercentage}%</div>
           <div className="metric-change positive">
             <CheckCircle style={{ width: '16px', height: '16px' }} />
-            All systems online
+            {metrics.cluster.healthyNodes}/{metrics.cluster.totalNodes} nodes online
           </div>
         </div>
 
@@ -75,10 +210,10 @@ const Dashboard: React.FC = () => {
               <Cpu style={{ width: '20px', height: '20px' }} />
             </div>
           </div>
-          <div className="metric-value">73.2%</div>
-          <div className="metric-change negative">
-            <TrendingUp style={{ width: '16px', height: '16px' }} />
-            +12% from yesterday
+          <div className="metric-value">{metrics.resources.cpu.utilization}%</div>
+          <div className="metric-change neutral">
+            <Activity style={{ width: '16px', height: '16px' }} />
+            {metrics.resources.cpu.totalCores} total cores
           </div>
         </div>
 
@@ -89,10 +224,10 @@ const Dashboard: React.FC = () => {
               <MemoryStick style={{ width: '20px', height: '20px' }} />
             </div>
           </div>
-          <div className="metric-value">58.4%</div>
-          <div className="metric-change positive">
-            <TrendingDown style={{ width: '16px', height: '16px' }} />
-            -4% from yesterday
+          <div className="metric-value">{metrics.resources.memory.utilization}%</div>
+          <div className="metric-change neutral">
+            <Activity style={{ width: '16px', height: '16px' }} />
+            {formatBytes(metrics.resources.memory.used)} used
           </div>
         </div>
 
@@ -103,10 +238,10 @@ const Dashboard: React.FC = () => {
               <HardDrive style={{ width: '20px', height: '20px' }} />
             </div>
           </div>
-          <div className="metric-value">18.7TB</div>
+          <div className="metric-value">{formatBytes(metrics.resources.storage.used)}</div>
           <div className="metric-change neutral">
             <Minus style={{ width: '16px', height: '16px' }} />
-            of 32TB total (58%)
+            of {formatBytes(metrics.resources.storage.total)} ({metrics.resources.storage.utilization}%)
           </div>
         </div>
 
@@ -117,15 +252,17 @@ const Dashboard: React.FC = () => {
               <Network style={{ width: '20px', height: '20px' }} />
             </div>
           </div>
-          <div className="metric-value">4.2GB/s</div>
+          <div className="metric-value">{formatThroughput(metrics.resources.network.totalThroughput)}</div>
           <div className="metric-change positive">
             <TrendingUp style={{ width: '16px', height: '16px' }} />
-            Peak: 8.9GB/s
+            Peak: {formatThroughput(metrics.resources.network.peakThroughput)}
           </div>
         </div>
       </div>
 
-      {/* Enhanced Main Panels with Individual Refresh */}
+      {/* Rest of the component remains the same... */}
+      {/* I'll include the key panels but truncate for brevity */}
+      
       <div className="panel-grid">
         {/* Resource Trends */}
         <div className="panel panel-lg">
@@ -133,13 +270,15 @@ const Dashboard: React.FC = () => {
             <div className="panel-title">
               <TrendingUp style={{ width: '16px', height: '16px' }} />
               Resource Usage Trends
-              <span className="live-indicator">
-                <div className="live-dot"></div>
-                Live
-              </span>
+              {loading && (
+                <span className="live-indicator">
+                  <div className="live-dot"></div>
+                  Updating...
+                </span>
+              )}
             </div>
             <div className="panel-actions">
-              <button className="panel-btn">
+              <button className="panel-btn" onClick={refresh} disabled={loading}>
                 <RefreshCw style={{ width: '14px', height: '14px' }} />
               </button>
               <button className="panel-btn">
@@ -149,7 +288,7 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="panel-content">
             <div className="chart-container">
-              <ResourceTrendsChart />
+              <ResourceTrendsChart data={resourceTrendsData} loading={loading} />
             </div>
           </div>
         </div>
@@ -162,14 +301,14 @@ const Dashboard: React.FC = () => {
               Instance Status
             </div>
             <div className="panel-actions">
-              <button className="panel-btn">
+              <button className="panel-btn" onClick={refresh} disabled={loading}>
                 <RefreshCw style={{ width: '14px', height: '14px' }} />
               </button>
             </div>
           </div>
           <div className="panel-content small">
             <div className="chart-container small">
-              <InstanceStatusChart />
+              <InstanceStatusChart data={instanceStatusData} loading={loading} />
             </div>
           </div>
         </div>
@@ -182,7 +321,7 @@ const Dashboard: React.FC = () => {
               Storage Pool Utilization
             </div>
             <div className="panel-actions">
-              <button className="panel-btn">
+              <button className="panel-btn" onClick={refresh} disabled={loading}>
                 <RefreshCw style={{ width: '14px', height: '14px' }} />
               </button>
               <button className="panel-btn">
@@ -204,102 +343,51 @@ const Dashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>
-                    <strong>default-zfs</strong>
-                  </td>
-                  <td>ZFS</td>
-                  <td>16.0TB</td>
-                  <td>11.2TB</td>
-                  <td>4.8TB</td>
-                  <td>
-                    <div className="progress-container">
-                      <div className="progress-bar">
-                        <div className="progress-fill high" style={{ width: '70%' }}></div>
-                      </div>
-                      <div className="progress-text">
-                        <span>70%</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="status-badge status-running">
-                      <span className="status-dot"></span>Active
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>ssd-cache</strong>
-                  </td>
-                  <td>Btrfs</td>
-                  <td>6.0TB</td>
-                  <td>2.7TB</td>
-                  <td>3.3TB</td>
-                  <td>
-                    <div className="progress-container">
-                      <div className="progress-bar">
-                        <div className="progress-fill medium" style={{ width: '45%' }}></div>
-                      </div>
-                      <div className="progress-text">
-                        <span>45%</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="status-badge status-running">
-                      <span className="status-dot"></span>Active
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>backup-lvm</strong>
-                  </td>
-                  <td>LVM</td>
-                  <td>8.0TB</td>
-                  <td>3.4TB</td>
-                  <td>4.6TB</td>
-                  <td>
-                    <div className="progress-container">
-                      <div className="progress-bar">
-                        <div className="progress-fill medium" style={{ width: '42.5%' }}></div>
-                      </div>
-                      <div className="progress-text">
-                        <span>42.5%</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="status-badge status-running">
-                      <span className="status-dot"></span>Active
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>nvme-fast</strong>
-                  </td>
-                  <td>ZFS</td>
-                  <td>2.0TB</td>
-                  <td>1.4TB</td>
-                  <td>0.6TB</td>
-                  <td>
-                    <div className="progress-container">
-                      <div className="progress-bar">
-                        <div className="progress-fill high" style={{ width: '70%' }}></div>
-                      </div>
-                      <div className="progress-text">
-                        <span>70%</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="status-badge status-running">
-                      <span className="status-dot"></span>Active
-                    </span>
-                  </td>
-                </tr>
+                {storagePools.map((pool) => {
+                  const resources = storageResources.get(pool.name);
+                  const total = resources?.space?.total || 0;
+                  const used = resources?.space?.used || 0;
+                  const available = total - used;
+                  const usage = total > 0 ? Math.round((used / total) * 100) : 0;
+
+                  return (
+                    <tr key={pool.name}>
+                      <td>
+                        <strong>{pool.name}</strong>
+                      </td>
+                      <td>{pool.driver?.toUpperCase() || 'Unknown'}</td>
+                      <td>{formatBytes(total)}</td>
+                      <td>{formatBytes(used)}</td>
+                      <td>{formatBytes(available)}</td>
+                      <td>
+                        <div className="progress-container">
+                          <div className="progress-bar">
+                            <div 
+                              className={`progress-fill ${usage > 80 ? 'high' : usage > 60 ? 'medium' : 'low'}`} 
+                              style={{ width: `${usage}%` }}
+                            ></div>
+                          </div>
+                          <div className="progress-text">
+                            <span>{usage}%</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`status-badge ${pool.status === 'Created' ? 'status-running' : 'status-warning'}`}>
+                          <span className="status-dot"></span>
+                          {pool.status || 'Active'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {storagePools.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', color: '#8b949e' }}>
+                      No storage pools found
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -313,7 +401,7 @@ const Dashboard: React.FC = () => {
               Network Bridges
             </div>
             <div className="panel-actions">
-              <button className="panel-btn">
+              <button className="panel-btn" onClick={refresh} disabled={loading}>
                 <RefreshCw style={{ width: '14px', height: '14px' }} />
               </button>
             </div>
@@ -329,48 +417,30 @@ const Dashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>
-                    <strong>lxdbr0</strong>
-                    <br />
-                    <small>10.0.0.1/24</small>
-                  </td>
-                  <td>NAT</td>
-                  <td>687</td>
-                  <td>
-                    <span className="status-badge status-running">
-                      <span className="status-dot"></span>Active
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>br-external</strong>
-                    <br />
-                    <small>192.168.1.0/24</small>
-                  </td>
-                  <td>Bridge</td>
-                  <td>423</td>
-                  <td>
-                    <span className="status-badge status-running">
-                      <span className="status-dot"></span>Active
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>ovn-virtual</strong>
-                    <br />
-                    <small>172.16.0.0/16</small>
-                  </td>
-                  <td>OVN</td>
-                  <td>137</td>
-                  <td>
-                    <span className="status-badge status-running">
-                      <span className="status-dot"></span>Active
-                    </span>
-                  </td>
-                </tr>
+                {networks.map((network) => (
+                  <tr key={network.name}>
+                    <td>
+                      <strong>{network.name}</strong>
+                      <br />
+                      <small>{network.config?.['ipv4.address'] || 'No IP configured'}</small>
+                    </td>
+                    <td>{network.type?.toUpperCase() || 'Bridge'}</td>
+                    <td>{network.used_by?.length || 0}</td>
+                    <td>
+                      <span className={`status-badge ${network.status === 'Created' ? 'status-running' : 'status-warning'}`}>
+                        <span className="status-dot"></span>
+                        {network.status || 'Active'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {networks.length === 0 && (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', color: '#8b949e' }}>
+                      No networks found
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -384,7 +454,7 @@ const Dashboard: React.FC = () => {
               Cluster Nodes Health Monitor
             </div>
             <div className="panel-actions">
-              <button className="panel-btn">
+              <button className="panel-btn" onClick={refresh} disabled={loading}>
                 <RefreshCw style={{ width: '14px', height: '14px' }} />
               </button>
               <button className="panel-btn">
@@ -394,95 +464,33 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="panel-content">
             <div className="node-grid">
-              <div className="node-card">
-                <div className="node-header">
-                  <div className="node-name">lxd-prod-01</div>
-                  <div className="node-status" style={{ background: '#3fb950' }}></div>
+              {clusterMembers.map((member) => (
+                <div key={member.server_name} className="node-card">
+                  <div className="node-header">
+                    <div className="node-name">{member.server_name}</div>
+                    <div 
+                      className="node-status" 
+                      style={{ 
+                        background: member.status === 'Online' ? '#3fb950' : 
+                                   member.status === 'Offline' ? '#f85149' : '#bb8009' 
+                      }}
+                    ></div>
+                  </div>
+                  <div className="node-metrics">
+                    <div>Status: {member.status}</div>
+                    <div>Arch: {member.architecture}</div>
+                    <div>Roles: {member.roles?.join(', ') || 'Member'}</div>
+                    <div>Database: {member.database ? 'Yes' : 'No'}</div>
+                    <div>URL: {member.url}</div>
+                    <div>Message: {member.message || 'OK'}</div>
+                  </div>
                 </div>
-                <div className="node-metrics">
-                  <div>CPU: 45%</div>
-                  <div>RAM: 62%</div>
-                  <div>Disk: 68%</div>
-                  <div>Load: 1.23</div>
-                  <div>Uptime: 47d</div>
-                  <div>Instances: 142</div>
+              ))}
+              {clusterMembers.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#8b949e', padding: '2rem' }}>
+                  No cluster members found or not in cluster mode
                 </div>
-              </div>
-
-              <div className="node-card">
-                <div className="node-header">
-                  <div className="node-name">lxd-prod-02</div>
-                  <div className="node-status" style={{ background: '#bb8009' }}></div>
-                </div>
-                <div className="node-metrics">
-                  <div>CPU: 89%</div>
-                  <div>RAM: 78%</div>
-                  <div>Disk: 54%</div>
-                  <div>Load: 3.45</div>
-                  <div>Uptime: 52d</div>
-                  <div>Instances: 198</div>
-                </div>
-              </div>
-
-              <div className="node-card">
-                <div className="node-header">
-                  <div className="node-name">lxd-prod-03</div>
-                  <div className="node-status" style={{ background: '#3fb950' }}></div>
-                </div>
-                <div className="node-metrics">
-                  <div>CPU: 58%</div>
-                  <div>RAM: 41%</div>
-                  <div>Disk: 71%</div>
-                  <div>Load: 2.01</div>
-                  <div>Uptime: 38d</div>
-                  <div>Instances: 156</div>
-                </div>
-              </div>
-
-              <div className="node-card">
-                <div className="node-header">
-                  <div className="node-name">lxd-prod-04</div>
-                  <div className="node-status" style={{ background: '#3fb950' }}></div>
-                </div>
-                <div className="node-metrics">
-                  <div>CPU: 23%</div>
-                  <div>RAM: 35%</div>
-                  <div>Disk: 45%</div>
-                  <div>Load: 0.87</div>
-                  <div>Uptime: 61d</div>
-                  <div>Instances: 98</div>
-                </div>
-              </div>
-
-              <div className="node-card">
-                <div className="node-header">
-                  <div className="node-name">lxd-prod-05</div>
-                  <div className="node-status" style={{ background: '#3fb950' }}></div>
-                </div>
-                <div className="node-metrics">
-                  <div>CPU: 67%</div>
-                  <div>RAM: 52%</div>
-                  <div>Disk: 63%</div>
-                  <div>Load: 2.34</div>
-                  <div>Uptime: 29d</div>
-                  <div>Instances: 174</div>
-                </div>
-              </div>
-
-              <div className="node-card">
-                <div className="node-header">
-                  <div className="node-name">lxd-prod-06</div>
-                  <div className="node-status" style={{ background: '#3fb950' }}></div>
-                </div>
-                <div className="node-metrics">
-                  <div>CPU: 34%</div>
-                  <div>RAM: 28%</div>
-                  <div>Disk: 39%</div>
-                  <div>Load: 1.12</div>
-                  <div>Uptime: 73d</div>
-                  <div>Instances: 89</div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -495,7 +503,7 @@ const Dashboard: React.FC = () => {
               Recent Operations & Events
             </div>
             <div className="panel-actions">
-              <button className="panel-btn">
+              <button className="panel-btn" onClick={refresh} disabled={loading}>
                 <RefreshCw style={{ width: '14px', height: '14px' }} />
               </button>
               <button className="panel-btn">
@@ -504,73 +512,33 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <div className="panel-content">
-            <div className="activity-item">
-              <div className="activity-icon activity-success">
-                <Check style={{ width: '18px', height: '18px' }} />
-              </div>
-              <div className="activity-content">
-                <div className="activity-title">Instance deployment completed successfully</div>
-                <div className="activity-desc">web-server-prod-247 deployed to lxd-prod-03 with 4 vCPU, 8GB RAM</div>
-                <div className="activity-time">3 minutes ago</div>
-              </div>
-            </div>
-
-            <div className="activity-item">
-              <div className="activity-icon activity-info">
-                <ArrowRight style={{ width: '18px', height: '18px' }} />
-              </div>
-              <div className="activity-content">
-                <div className="activity-title">Live migration in progress</div>
-                <div className="activity-desc">
-                  database-prod-main migrating from lxd-prod-02 to lxd-prod-05 (68% complete)
+            {recentOperations.map((operation) => (
+              <div key={operation.id} className="activity-item">
+                <div className={`activity-icon ${
+                  operation.status === 'Success' ? 'activity-success' :
+                  operation.status === 'Running' ? 'activity-info' :
+                  operation.status === 'Failed' ? 'activity-error' : 'activity-warning'
+                }`}>
+                  {operation.status === 'Success' ? <Check style={{ width: '18px', height: '18px' }} /> :
+                   operation.status === 'Running' ? <ArrowRight style={{ width: '18px', height: '18px' }} /> :
+                   operation.status === 'Failed' ? <X style={{ width: '18px', height: '18px' }} /> :
+                   <AlertTriangle style={{ width: '18px', height: '18px' }} />}
                 </div>
-                <div className="activity-time">8 minutes ago</div>
+                <div className="activity-content">
+                  <div className="activity-title">{operation.description || operation.class}</div>
+                  <div className="activity-desc">
+                    Operation ID: {operation.id} • Status: {operation.status}
+                    {operation.err && ` • Error: ${operation.err}`}
+                  </div>
+                  <div className="activity-time">{getTimeAgo(new Date(operation.created_at))}</div>
+                </div>
               </div>
-            </div>
-
-            <div className="activity-item">
-              <div className="activity-icon activity-success">
-                <Check style={{ width: '18px', height: '18px' }} />
+            ))}
+            {recentOperations.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#8b949e', padding: '2rem' }}>
+                No recent operations found
               </div>
-              <div className="activity-content">
-                <div className="activity-title">Storage pool expansion completed</div>
-                <div className="activity-desc">default-zfs pool expanded by 8TB, total capacity now 16TB</div>
-                <div className="activity-time">22 minutes ago</div>
-              </div>
-            </div>
-
-            <div className="activity-item">
-              <div className="activity-icon activity-warning">
-                <AlertTriangle style={{ width: '18px', height: '18px' }} />
-              </div>
-              <div className="activity-content">
-                <div className="activity-title">High CPU usage alert triggered</div>
-                <div className="activity-desc">lxd-prod-02 CPU utilization at 89% for the last 20 minutes</div>
-                <div className="activity-time">25 minutes ago</div>
-              </div>
-            </div>
-
-            <div className="activity-item">
-              <div className="activity-icon activity-success">
-                <Check style={{ width: '18px', height: '18px' }} />
-              </div>
-              <div className="activity-content">
-                <div className="activity-title">Automated backup completed</div>
-                <div className="activity-desc">Production project backup: 2.4GB, 147 instances, duration: 8m 34s</div>
-                <div className="activity-time">2 hours ago</div>
-              </div>
-            </div>
-
-            <div className="activity-item">
-              <div className="activity-icon activity-error">
-                <X style={{ width: '18px', height: '18px' }} />
-              </div>
-              <div className="activity-content">
-                <div className="activity-title">Instance start failed</div>
-                <div className="activity-desc">test-container-84 failed to start on lxd-prod-04: insufficient memory</div>
-                <div className="activity-time">3 hours ago</div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -582,14 +550,14 @@ const Dashboard: React.FC = () => {
               Performance Metrics
             </div>
             <div className="panel-actions">
-              <button className="panel-btn">
+              <button className="panel-btn" onClick={refresh} disabled={loading}>
                 <RefreshCw style={{ width: '14px', height: '14px' }} />
               </button>
             </div>
           </div>
           <div className="panel-content">
             <div className="chart-container">
-              <PerformanceChart />
+              <PerformanceChart data={performanceData} loading={loading} />
             </div>
           </div>
         </div>

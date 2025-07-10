@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// src/components/charts/PerformanceChart.tsx - Updated with real data
 import React from 'react';
 import { Bar } from 'react-chartjs-2';
 import {
@@ -19,19 +21,36 @@ ChartJS.register(
   Legend
 );
 
-const PerformanceChart: React.FC = () => {
-  const data = {
-    labels: ['Node 1', 'Node 2', 'Node 3', 'Node 4', 'Node 5', 'Node 6'],
+interface PerformanceChartProps {
+  data?: {
+    labels: string[];
+    datasets: {
+      label: string;
+      data: number[];
+      backgroundColor: string;
+      borderRadius: number;
+      maxBarThickness: number;
+    }[];
+  } | null;
+  loading?: boolean;
+}
+
+const PerformanceChart: React.FC<PerformanceChartProps> = ({ data, loading = false }) => {
+  // Fallback data when no real data is available
+  const fallbackData = {
+    labels: ['No Data'],
     datasets: [
       {
-        label: 'CPU Load Average',
-        data: [1.23, 3.45, 2.01, 0.87, 2.34, 1.12],
+        label: 'Load Average',
+        data: [0],
         backgroundColor: '#1f6feb',
         borderRadius: 6,
         maxBarThickness: 40,
       },
     ],
   };
+
+  const chartData = data || fallbackData;
 
   const options = {
     responsive: true,
@@ -40,6 +59,13 @@ const PerformanceChart: React.FC = () => {
       legend: {
         display: false,
       },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}`;
+          }
+        }
+      }
     },
     scales: {
       x: {
@@ -71,7 +97,22 @@ const PerformanceChart: React.FC = () => {
     },
   };
 
-  return <Bar options={options} data={data} />;
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100%',
+        color: '#8b949e' 
+      }}>
+        <div className="spinner" style={{ width: '24px', height: '24px' }}></div>
+        <span style={{ marginLeft: '0.5rem' }}>Loading performance...</span>
+      </div>
+    );
+  }
+
+  return <Bar options={options} data={chartData} />;
 };
 
 export default PerformanceChart;

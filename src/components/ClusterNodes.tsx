@@ -16,12 +16,9 @@ import {
   AlertTriangle,
   Activity,
   Clock,
-  Users,
   BarChart3,
   Eye,
   Terminal,
-  Wifi,
-  Database,
 } from 'lucide-react';
 
 const ClusterNodes: React.FC = () => {

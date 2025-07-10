@@ -3,7 +3,6 @@ import React from 'react';
 import {
   Box,
   Play,
-  Square,
   AlertTriangle,
   Activity,
   Cpu,
@@ -11,7 +10,6 @@ import {
   HardDrive,
   Network,
   Clock,
-  Users,
   Server,
   Zap,
   TrendingUp,
@@ -26,7 +24,6 @@ import {
   PieChart,
   CheckCircle,
   XCircle,
-  Loader,
   Eye,
   Terminal,
   Trash2,

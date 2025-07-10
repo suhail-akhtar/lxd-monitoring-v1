@@ -12,8 +12,6 @@ import {
   RefreshCw,
   Maximize2,
   Settings,
-  Filter,
-  Download,
   Plus,
   Eye,
   Edit,

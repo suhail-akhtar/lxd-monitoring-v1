@@ -6,7 +6,6 @@ import {
   Settings,
   Shield,
   TrendingUp,
-  TrendingDown,
   Activity,
   CheckCircle,
   AlertTriangle,
@@ -15,18 +14,11 @@ import {
   Plus,
   Eye,
   Edit,
-  Trash2,
-  Lock,
   Unlock,
-  Server,
-  Box,
-  HardDrive,
-  Network,
   Clock,
   BarChart3,
   PieChart,
   Target,
-  Calendar,
 } from 'lucide-react';
 
 const Projects: React.FC = () => {

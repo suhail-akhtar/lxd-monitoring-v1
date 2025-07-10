@@ -6,7 +6,6 @@ import {
   Folder,
   Zap,
   TrendingUp,
-  TrendingDown,
   RefreshCw,
   Maximize2,
   Settings,
@@ -17,11 +16,9 @@ import {
   BarChart3,
   Eye,
   Edit,
-  Trash2,
   Plus,
   Archive,
   FileText,
-  Server,
 } from 'lucide-react';
 
 const Storage: React.FC = () => {

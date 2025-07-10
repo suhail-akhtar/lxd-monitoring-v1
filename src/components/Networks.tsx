@@ -3,7 +3,6 @@ import React from 'react';
 import {
   Network,
   Wifi,
-  Globe,
   Zap,
   TrendingUp,
   TrendingDown,
@@ -17,9 +16,7 @@ import {
   BarChart3,
   Eye,
   Edit,
-  Shield,
   Router,
-  Cable,
   Signal,
 } from 'lucide-react';
 

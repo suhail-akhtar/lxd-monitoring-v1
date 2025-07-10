@@ -3,7 +3,6 @@ import React from 'react';
 import {
   Activity,
   Play,
-  Square,
   Pause,
   CheckCircle,
   XCircle,
@@ -14,8 +13,6 @@ import {
   RefreshCw,
   Maximize2,
   Settings,
-  AlertTriangle,
-  Users,
   Server,
   BarChart3,
   Eye,

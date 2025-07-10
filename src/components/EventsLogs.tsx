@@ -11,8 +11,6 @@ import {
   Download,
   RefreshCw,
   Maximize2,
-  Settings,
-  Clock,
   Server,
   Activity,
   TrendingUp,
@@ -20,7 +18,6 @@ import {
   BarChart3,
   Eye,
   FileText,
-  Calendar,
   Zap,
   Shield,
 } from 'lucide-react';

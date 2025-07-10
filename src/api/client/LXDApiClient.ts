@@ -37,6 +37,7 @@ export class LXDApiClient extends BaseApiClient {
       endpoint === skip || endpoint.startsWith(skip + '/')
     );
 
+    // Skip if no project or endpoint doesn't support projects
     if (shouldSkipProject || !project) {
       return endpoint;
     }
@@ -116,24 +117,22 @@ export class LXDApiClient extends BaseApiClient {
     }
   }
 
-  // LXD API methods - project will be auto-injected
+  // LXD API methods - project will be auto-injected when currentProject is set
   async getApiVersion(): Promise<any> {
     return this.makeRequest('/1.0');
   }
 
-  async getInstances(project?: string): Promise<any> {
-    const endpoint = project ? this.addProjectParam('/1.0/instances', project) : '/1.0/instances';
-    return this.makeRequest(endpoint);
+  // FIXED: Remove manual project injection since it's now automatic
+  async getInstances(): Promise<any> {
+    return this.makeRequest('/1.0/instances');
   }
 
-  async getInstanceInfo(name: string, project?: string): Promise<any> {
-    const endpoint = project ? this.addProjectParam(`/1.0/instances/${name}`, project) : `/1.0/instances/${name}`;
-    return this.makeRequest(endpoint);
+  async getInstanceInfo(name: string): Promise<any> {
+    return this.makeRequest(`/1.0/instances/${name}`);
   }
 
-  async getInstanceState(name: string, project?: string): Promise<any> {
-    const endpoint = project ? this.addProjectParam(`/1.0/instances/${name}/state`, project) : `/1.0/instances/${name}/state`;
-    return this.makeRequest(endpoint);
+  async getInstanceState(name: string): Promise<any> {
+    return this.makeRequest(`/1.0/instances/${name}/state`);
   }
 
   async getClusterMembers(): Promise<any> {

@@ -436,7 +436,7 @@ private async fetchProjects(): Promise<ProjectInfo[]> {
   // Existing methods with fixes
   private async fetchInstances(): Promise<InstanceInfo[]> {
     try {
-      const instanceUrls = await this.apiClient.getInstances(this.config.project);
+      const instanceUrls = await this.apiClient.getInstances(); // Removed project param
       
       if (!Array.isArray(instanceUrls)) {
         console.warn('Instances API returned non-array:', instanceUrls);
@@ -448,7 +448,7 @@ private async fetchProjects(): Promise<ProjectInfo[]> {
           const instanceName = url.split('/').pop();
           if (!instanceName) return null;
           
-          return await this.apiClient.getInstanceInfo(instanceName, this.config.project);
+          return await this.apiClient.getInstanceInfo(instanceName); // Removed project param
         } catch (error) {
           console.error(`Failed to fetch instance info for ${url}:`, error);
           return null;
@@ -468,7 +468,7 @@ private async fetchProjects(): Promise<ProjectInfo[]> {
 
     const statePromises = instances.map(async (instance) => {
       try {
-        const state = await this.apiClient.getInstanceState(instance.name, this.config.project);
+        const state = await this.apiClient.getInstanceState(instance.name); // Removed project param
         stateMap.set(instance.name, state);
       } catch (error) {
         console.error(`Failed to fetch state for instance ${instance.name}:`, error);
@@ -657,8 +657,12 @@ private async fetchNetworkStates(networks: NetworkInfo[]): Promise<Map<string, N
   }
 
   // New method to change project
-  async switchProject(projectName: string): Promise<void> {
+   async switchProject(projectName: string): Promise<void> {
+    console.log(`🔄 DashboardService: Switching to project "${projectName}"`);
     this.config.project = projectName;
+    
+    // THIS IS THE KEY FIX: Update the API client's current project
+    this.apiClient.setCurrentProject(projectName);
   }
 
   // Get available projects

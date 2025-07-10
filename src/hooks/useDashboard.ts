@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/hooks/useDashboard.ts - Fixed version with proper project switching
+// src/hooks/useDashboard.ts - Fixed to properly detect project changes
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ServiceFactory } from '../api/ServiceFactory';
 import type { DashboardData } from '../api/types/dashboard';
-import { useProject } from '../hooks/useProject';
+import { useProject } from '../context/ProjectContext';
 
 export interface UseDashboardOptions {
   project?: string; 
@@ -49,7 +49,6 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
   );
 
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const previousProjectRef = useRef<string>(currentProject);
 
   const fetchData = useCallback(async (showLoading = true) => {
     if (showLoading) {
@@ -58,30 +57,30 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
     setError(null);
 
     try {
-      // Update service with current project
+      // CRITICAL FIX: Always sync project with service before fetching
+      console.log(`🔄 useDashboard: Syncing project "${currentProject}" with service`);
       await dashboardService.current.switchProject(currentProject);
       
-      console.log(`Fetching dashboard data for project: ${currentProject || 'all projects'}`);
+      console.log(`🔄 useDashboard: Fetching data for project: ${currentProject || 'all projects'}`);
       const dashboardData = await dashboardService.current.getDashboardData();
       setData(dashboardData as EnhancedDashboardData);
       setLastUpdated(new Date());
-      console.log('Dashboard data loaded successfully');
+      console.log('✅ useDashboard: Data loaded successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch dashboard data';
       setError(errorMessage);
-      console.error('Dashboard data fetch error:', err);
+      console.error('❌ useDashboard: Fetch error:', err);
     } finally {
       if (showLoading) {
         setLoading(false);
       }
     }
-  }, [currentProject]);
+  }, [currentProject]); // Include currentProject in dependencies
 
   const refreshMetricsOnly = useCallback(async () => {
     if (!data) return;
 
     try {
-      // Cast to any as refreshMetrics is not in the current type definition
       const metrics = await (dashboardService.current as any).refreshMetrics();
       setData(prevData => prevData ? { ...prevData, metrics } : null);
       setLastUpdated(new Date());
@@ -103,23 +102,11 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
     }
   }, [autoRefresh, refreshInterval, refresh]);
 
-  // Refresh when project changes
+  // FIXED: Always refresh when currentProject changes
   useEffect(() => {
-    // Only refresh if project actually changed
-    if (previousProjectRef.current !== currentProject) {
-      console.log(`Project changed from "${previousProjectRef.current}" to "${currentProject}" - refreshing data`);
-      previousProjectRef.current = currentProject;
-      fetchData();
-    }
-  }, [currentProject, fetchData]);
-
-  // Initial load
-  useEffect(() => {
-    if (previousProjectRef.current === currentProject) {
-      // Only do initial load if we haven't already loaded for this project
-      fetchData();
-    }
-  }, []); // Only run on mount
+    console.log(`🔄 useDashboard: Project changed to "${currentProject}" - refreshing data`);
+    fetchData();
+  }, [currentProject, fetchData]); // This will trigger when project changes
 
   // Auto-refresh setup
   useEffect(() => {

@@ -65,32 +65,6 @@ body {
     font-weight: 500;
 }
 
-/* Fix for button-based navigation */
-.nav-item {
-    background: none;
-    border: none;
-    cursor: pointer;
-    width: 100%;
-    text-align: left;
-    font-family: inherit;
-    border-left: 3px solid transparent;
-}
-
-.nav-item:focus {
-    outline: none;
-    background: rgba(35, 134, 54, 0.1);
-}
-
-.nav-item:focus-visible {
-    outline: 2px solid #2ea043;
-    outline-offset: -2px;
-}
-
-/* Ensure proper text alignment */
-.nav-item span {
-    flex: 1;
-}
-
 .nav-section {
     padding: 1.5rem 0 1rem;
 }
@@ -194,10 +168,6 @@ body {
     gap: 1rem;
 }
 
-select option {
-    background-color: #171717; 
-    border-color: transparent;
-}
 .project-selector {
     background: linear-gradient(135deg, #21262d, #30363d);
     border: 1px solid #444c56;

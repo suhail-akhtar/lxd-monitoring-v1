@@ -1,4 +1,5 @@
-import React from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState, useEffect } from 'react';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -19,19 +20,64 @@ ChartJS.register(
   Legend
 );
 
-const PerformanceChart: React.FC = () => {
-  const data = {
-    labels: ['Node 1', 'Node 2', 'Node 3', 'Node 4', 'Node 5', 'Node 6'],
-    datasets: [
-      {
-        label: 'CPU Load Average',
-        data: [1.23, 3.45, 2.01, 0.87, 2.34, 1.12],
-        backgroundColor: '#1f6feb',
-        borderRadius: 6,
-        maxBarThickness: 40,
-      },
-    ],
+interface PerformanceChartProps {
+  project?: string;
+  refreshTrigger?: number;
+}
+
+interface ChartData {
+  labels: string[];
+  datasets: Array<{
+    label: string;
+    data: number[];
+    backgroundColor: string;
+    borderRadius: number;
+    maxBarThickness: number;
+  }>;
+}
+
+const PerformanceChart: React.FC<PerformanceChartProps> = ({ 
+  project = 'all', 
+  refreshTrigger = 0 
+}) => {
+  const [chartData, setChartData] = useState<ChartData>({
+    labels: [],
+    datasets: []
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const endpoint = project === 'all' 
+        ? '/api/lxd/charts/performance'
+        : `/api/lxd/charts/performance/${project}`;
+      
+      const response = await fetch(endpoint);
+      const result = await response.json();
+      
+      if (result.success) {
+        setChartData(result.data);
+      } else {
+        setError(result.error || 'Failed to fetch data');
+      }
+    } catch (err) {
+      setError(`Network error: ${err}`);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchData();
+    
+    // Refresh data every 60 seconds
+    const interval = setInterval(fetchData, 60000);
+    return () => clearInterval(interval);
+  }, [project, refreshTrigger]);
 
   const options = {
     responsive: true,
@@ -40,6 +86,13 @@ const PerformanceChart: React.FC = () => {
       legend: {
         display: false,
       },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            return `Load Average: ${context.parsed.y}`;
+          }
+        }
+      }
     },
     scales: {
       x: {
@@ -71,7 +124,52 @@ const PerformanceChart: React.FC = () => {
     },
   };
 
-  return <Bar options={options} data={data} />;
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100%' 
+      }}>
+        <div className="spinner" style={{ width: '32px', height: '32px' }}></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100%',
+        color: '#f85149',
+        textAlign: 'center'
+      }}>
+        <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>Failed to load performance</p>
+        <p style={{ fontSize: '0.75rem', opacity: 0.8 }}>{error}</p>
+        <button 
+          onClick={fetchData}
+          style={{
+            marginTop: '0.5rem',
+            padding: '0.25rem 0.5rem',
+            background: '#1f6feb',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.75rem'
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return <Bar options={options} data={chartData} />;
 };
 
 export default PerformanceChart;

@@ -130,6 +130,11 @@ body {
     flex-shrink: 0;
 }
 
+
+select option{
+    background-color: #161b22;
+}
+
 /* Enhanced Main Content */
 .main-container {
     margin-left: 240px;

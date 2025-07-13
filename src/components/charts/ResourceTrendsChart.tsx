@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -23,52 +23,71 @@ ChartJS.register(
   Filler
 );
 
-const ResourceTrendsChart: React.FC = () => {
-  const data = {
-    labels: ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
-    datasets: [
-      {
-        label: 'CPU Usage (%)',
-        data: [45, 48, 52, 58, 65, 72, 78, 82, 87, 84, 79, 73],
-        borderColor: '#58a6ff',
-        backgroundColor: 'rgba(88, 166, 255, 0.1)',
-        tension: 0.4,
-        fill: true,
-        borderWidth: 3,
-        pointBackgroundColor: '#58a6ff',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        pointRadius: 5,
-      },
-      {
-        label: 'Memory Usage (%)',
-        data: [38, 40, 41, 43, 45, 47, 48, 50, 52, 51, 49, 46],
-        borderColor: '#3fb950',
-        backgroundColor: 'rgba(63, 185, 80, 0.1)',
-        tension: 0.4,
-        fill: true,
-        borderWidth: 3,
-        pointBackgroundColor: '#3fb950',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        pointRadius: 5,
-      },
-      {
-        label: 'Storage I/O (MB/s)',
-        data: [125, 138, 145, 167, 189, 234, 267, 289, 312, 298, 276, 251],
-        borderColor: '#bb8009',
-        backgroundColor: 'rgba(187, 128, 9, 0.1)',
-        tension: 0.4,
-        fill: true,
-        borderWidth: 3,
-        pointBackgroundColor: '#bb8009',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        pointRadius: 5,
-        yAxisID: 'y1',
-      },
-    ],
+interface ResourceTrendsChartProps {
+  project?: string;
+  refreshTrigger?: number;
+}
+
+interface ChartData {
+  labels: string[];
+  datasets: Array<{
+    label: string;
+    data: number[];
+    borderColor: string;
+    backgroundColor: string;
+    tension: number;
+    fill: boolean;
+    borderWidth: number;
+    pointBackgroundColor: string;
+    pointBorderColor: string;
+    pointBorderWidth: number;
+    pointRadius: number;
+    yAxisID?: string;
+  }>;
+}
+
+const ResourceTrendsChart: React.FC<ResourceTrendsChartProps> = ({ 
+  project = 'all', 
+  refreshTrigger = 0 
+}) => {
+  const [chartData, setChartData] = useState<ChartData>({
+    labels: [],
+    datasets: []
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const endpoint = project === 'all' 
+        ? '/api/lxd/charts/resource-trends'
+        : `/api/lxd/charts/resource-trends/${project}`;
+      
+      const response = await fetch(endpoint);
+      const result = await response.json();
+      
+      if (result.success) {
+        setChartData(result.data);
+      } else {
+        setError(result.error || 'Failed to fetch data');
+      }
+    } catch (err) {
+      setError(`Network error: ${err}`);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchData();
+    
+    // Set up real-time updates every 30 seconds
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [project, refreshTrigger]);
 
   const options = {
     responsive: true,
@@ -138,7 +157,52 @@ const ResourceTrendsChart: React.FC = () => {
     },
   };
 
-  return <Line options={options} data={data} />;
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100%' 
+      }}>
+        <div className="spinner" style={{ width: '32px', height: '32px' }}></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100%',
+        color: '#f85149',
+        textAlign: 'center'
+      }}>
+        <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>Failed to load trends</p>
+        <p style={{ fontSize: '0.75rem', opacity: 0.8 }}>{error}</p>
+        <button 
+          onClick={fetchData}
+          style={{
+            marginTop: '0.5rem',
+            padding: '0.25rem 0.5rem',
+            background: '#1f6feb',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.75rem'
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return <Line options={options} data={chartData} />;
 };
 
 export default ResourceTrendsChart;
